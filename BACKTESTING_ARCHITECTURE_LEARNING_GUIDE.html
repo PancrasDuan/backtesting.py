@@ -308,7 +308,7 @@
           <section class="concept"><h3>统计只消费结果</h3><p><code>compute_stats</code> 从交易和权益生成结果；<code>_plotting</code> 读取结果而不参与成交。</p></section>
           <section class="concept"><h3>并行有明确边界</h3><p><code>SharedMemoryManager</code> 传数据，<code>Pool</code> 执行参数批次；最佳参数回到主进程完整复跑。</p></section>
         </div>
-        <h3>一次 run 的九个动作</h3>
+        <h3>一次 run 的六个动作</h3>
         <ol>
           <li>校验并保存输入；每次 <code>run()</code> 新建 <code>_Data</code>、<code>_Broker</code> 与策略实例。</li>
           <li>校验策略参数，调用一次 <code>init()</code>，让 <code>Strategy.I</code> 全量预计算指标。</li>
@@ -319,7 +319,7 @@
         </ol>
         <div class="callout"><strong>第一不变量：</strong>交易状态的唯一事实来源是 <code>_Broker</code>。Order、Trade、Position 和 Strategy 都不能另存一套“账户真相”。</div>
         <div class="quiz">
-          <button type="button" data-action="toggle-detail" aria-expanded="false" aria-controls="overview-detail">展开：为什么先 broker 后 strategy？</button>
+          <button type="button" data-action="toggle-detail" aria-expanded="true" aria-controls="overview-detail">展开：为什么先 broker 后 strategy？</button>
           <div id="overview-detail" data-detail><p>这使当前 <code>strategy.next()</code> 新建的默认市价单只能在下一次 broker tick 处理，通常按下一 bar Open 成交，从而保留 bar 级因果顺序。<code>trade_on_close</code> 只改变下一次撮合采用前一 Close 和时间索引，并非同步成交。</p></div>
         </div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="overview" aria-pressed="false">标记总览已完成</button></div>
@@ -342,7 +342,7 @@
         <div class="callout"><strong>观察点：</strong><code>start = 1 + _indicator_warmup_nbars(strategy)</code>。<code>+1</code> 保证至少可以安全访问上一条记录。</div>
         <h3>自测</h3>
         <p>类属性 <code>n = 10</code> 时，<code>run(n=20)</code> 会覆盖声明参数；<code>run(nn=20)</code> 因未知参数失败。哪些动作每次 run 一次，哪些每 bar 一次？</p>
-        <button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer1">查看答案</button>
+        <button type="button" data-action="toggle-answer" aria-expanded="true" aria-controls="answer1">查看答案</button>
         <div id="answer1" data-answer><p>装配、参数校验、<code>init()</code>、指标全量计算和统计各一次；窗口推进、指标切片、broker 撮合、strategy 决策按 bar 重复。</p></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage1" aria-pressed="false">标记阶段1已完成</button></div>
       </article>
@@ -361,7 +361,7 @@
         <h3>安全路径与绕过路径</h3>
         <p>正常通过 <code>self.data</code>、<code>_Array.s</code>/<code>.df</code> 与 <code>self.I()</code> 属性访问时，只能看到当前窗口。但若在 <code>init()</code> 保存当时的全长 <code>self.data.Close</code> 引用，并在 <code>next()</code> 直接读取其尾部，就绕过了切片协议。这是框架约定，不是进程级沙箱。</p>
         <div class="callout"><strong>精确时间边界：</strong>Buy &amp; Hold 从 Close[warmup] 而主循环从 1+warmup 开始。若 warmup=9，基准从 Close[9] 起算；主循环从 i=10 开始，第一次 <code>Strategy.next()</code> 看见 11 条记录，因此基准起点比首次策略调用早一根 bar。</div>
-        <button type="button" data-action="toggle-detail" aria-expanded="false" aria-controls="stage2-detail">展开：缓存为何必须清空？</button>
+        <button type="button" data-action="toggle-detail" aria-expanded="true" aria-controls="stage2-detail">展开：缓存为何必须清空？</button>
         <div id="stage2-detail" data-detail><p><code>_Data.__get_array()</code> 缓存当前长度的切片视图。若推进长度后不清缓存，策略会继续拿到旧前缀；若直接缓存全长，又会破坏可见性。</p></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage2" aria-pressed="false">标记阶段2已完成</button></div>
       </article>
@@ -371,7 +371,7 @@
         <h2><code>Order</code> 是意图，<code>Trade</code> 是 lot，<code>Position</code> 是视图</h2>
         <p class="objective">读完要能解释关闭 API、反向下单、<code>hedging</code> 与 <code>exclusive_orders</code> 的差别。</p>
         <div class="concept-grid">
-          <section class="concept"><h3>Order</h3><p>等待撮合的指令。size 正负代表方向；0 到 1 之间的绝对值表示可用流动性比例，绝对值至少 1 时是整数单位。</p></section>
+          <section class="concept"><h3>Order</h3><p>等待撮合的指令。不变量是 Order.size != 0；size 正负代表方向；0 到 1 之间的绝对值表示可用流动性比例，绝对值至少 1 时是整数单位。</p></section>
           <section class="concept"><h3>Trade</h3><p>独立成交 lot，保存 entry/exit price、bar、size、tag、commission 及可选 SL/TP 关联。</p></section>
           <section class="concept"><h3>Position</h3><p>动态汇总 broker 上的活动 trades，不独立保存仓位。多个 trade 仍只有一个净视图。</p></section>
           <section class="concept"><h3>SL / TP</h3><p>都是带 parent trade 的反向 contingent <code>Order</code>：SL 是 stop-market，TP 是 limit。</p></section>
@@ -380,7 +380,8 @@
         <ol class="flow"><li>Pending Order</li><li>Active Trade</li><li>部分 reduce 或 close order</li><li>Closed Trade</li></ol>
         <p><code>Trade.close(portion)</code> 创建带 <code>parent_trade</code> 的反向市价单并插入队首；<code>Position.close</code> 对每个活动 trade 分别做同样动作。普通 <code>sell()</code> 是独立订单：<code>hedging=False</code> 时可 FIFO 抵消 long，<code>hedging=True</code> 时多空可并存。</p>
         <p><code>exclusive_orders=True</code> 会取消非 contingent 挂单，并给现有 trades 插入 close orders，再排入新订单。父 trade 全平时，SL/TP 同步取消形成 OCO；部分平仓会复制一份 closed trade 记录，并缩小剩余 trade 与附属单 size。</p>
-        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer3">自测：为什么 sell 不等于精确平仓？</button><div id="answer3" data-answer><p>sell 没有指定 parent trade，其结果受 hedging、FIFO 抵消、单位换算和可用 margin 影响。若要关闭指定 lot，应使用 <code>Trade.close()</code>；关闭净视图用 <code>Position.close()</code>。</p></div></div>
+        <div class="callout"><strong>下单价格不变量：</strong>多头：SL &lt; 入场价 &lt; TP；空头：TP &lt; 入场价 &lt; SL。<code>new_order()</code> 在排队前校验该顺序，参考入场价会考虑 spread。</div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="true" aria-controls="answer3">自测：为什么 sell 不等于精确平仓？</button><div id="answer3" data-answer><p>sell 没有指定 parent trade，其结果受 hedging、FIFO 抵消、单位换算和可用 margin 影响。若要关闭指定 lot，应使用 <code>Trade.close()</code>；关闭净视图用 <code>Position.close()</code>。</p></div></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage3" aria-pressed="false">标记阶段3已完成</button></div>
       </article>
 
@@ -394,12 +395,13 @@
           <tr><td><code>trade_on_close=True</code> 的非 contingent 纯市价单</td><td>仍在下一次 broker tick</td><td>前一 bar Close，时间索引也记前一 bar</td></tr>
           <tr><td>long stop-market</td><td>High ≥ stop</td><td><code>max(Open, stop)</code>，跳空可劣化</td></tr>
           <tr><td>long limit</td><td>Low ≤ limit</td><td><code>min(Open, limit)</code>，开盘可改善</td></tr>
+          <tr><td>stop-limit：先触发 stop</td><td>long 要求 High ≥ stop 使 stop 生效，并满足 Low ≤ limit；short 要求 Low ≤ stop，并满足 High ≥ limit。若同 bar 的 limit 可能先于 stop 到达，保守地暂不成交。</td><td>stop 与 limit 都按规则有效后，long 取 <code>min(stop, limit)</code>，short 取 <code>max(stop, limit)</code>；随后 stand-alone 开仓才叠加方向 spread 与 commission 容量成本。</td></tr>
           <tr><td>contingent SL / TP</td><td>SL 用 stop，TP 用 limit</td><td>关闭价不再做独立 entry spread 调整</td></tr>
         </tbody></table></div>
         <h3>账户与成本</h3>
         <ul><li><code>spread</code> 进入方向调整后的 stand-alone 入场价：long × (1 + spread)，short × (1 - spread)。</li><li><code>commission</code> 是现金流，开仓和平仓各收一次；可以是比例、固定加比例或函数。</li><li><code>margin</code> 转成 <code>leverage = 1 / margin</code>，约束可新增名义价值，不是简单扣掉一笔保证金现金。</li><li>equity = cash + 活动 trades 的未实现 PnL；margin available = max(0, equity - margin used)。</li></ul>
-        <div class="callout"><strong>同 bar 歧义：</strong>OHLC 只能证明价格范围，不能证明先到 SL 还是 TP。market entry 新附属单会在同 bar 重处理，SL 因队列在前形成保守结果；stop/limit 父订单的不可判定附属单可被警告并延后。没有订单簿、容量、冲击、排队和逐笔路径。</div>
-        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer4">自测：long stop=105，Open=108，High=110</button><div id="answer4" data-answer><p>stop 命中，基础成交价是 <code>max(108, 105) = 108</code>，体现向上跳空后以更差价格开多。之后再计算方向 spread 与 commission。</p></div></div>
+        <div class="callout"><strong>框架假设 · 同 bar 歧义：</strong>OHLC 只能证明价格范围，不能证明先到 SL 还是 TP。market entry 新附属单会在同 bar 重处理，SL 因队列在前形成保守结果；stop/limit 父订单的不可判定附属单可被警告并延后。这些触发顺序和成交价是研究模型的确定性规则，不是实盘成交保证；框架没有订单簿、容量、冲击、排队和逐笔路径。</div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="true" aria-controls="answer4">自测：long stop=105，Open=108，High=110</button><div id="answer4" data-answer><p>stop 命中，基础成交价是 <code>max(108, 105) = 108</code>，体现向上跳空后以更差价格开多。之后再计算方向 spread 与 commission。</p></div></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage4" aria-pressed="false">标记阶段4已完成</button></div>
       </article>
 
@@ -410,10 +412,11 @@
         <ol class="flow"><li><code>broker._equity</code></li><li><code>broker.closed_trades</code></li><li><code>compute_stats</code></li><li><code>_Stats</code></li><li><code>_plotting.plot</code></li></ol>
         <p>broker 每次 <code>next()</code> 后写当期 equity。循环结束，前缀与空位被补齐，<code>compute_stats</code> 同时收到完整 equity、closed trades、原 OHLC 和策略。</p>
         <div class="callout"><strong>必须分清：</strong>交易层指标只用 closed trades，而权益类指标用完整 equity。具体地，<code>_trades</code>、胜率、SQN、平均交易等只使用 broker.closed_trades；Equity Final、Return、回撤等读取完整 equity，其中仍含活动 trade 的未实现盈亏。<code>finalize_trades</code> 决定末尾活动 trade 是否被强制关闭并进入交易表与交易层指标。</div>
-        <p><code>compute_stats</code> 从交易构造 Size、Entry/ExitBar、价格、PnL、Commission、ReturnPct、时间、Duration、Tag 与指标值；从 equity 构造收益、累计峰值、DrawdownPct 和回撤持续时间。SQN 是交易 PnL 的函数，因此不直接依赖 OHLC；年化、Sharpe、Sortino、Calmar 则还依赖时间索引、交易日假设和重采样。</p>
+        <p><code>compute_stats</code> 从交易构造 Size、Entry/ExitBar、价格、PnL、Commission、ReturnPct、时间、Duration、Tag 与指标值；从 equity 构造收益、累计峰值、DrawdownPct 和回撤持续时间。SQN 是交易 PnL 的函数，因此不直接依赖 OHLC。</p>
+        <div class="callout"><strong>模型限制 · 年化假设：</strong>年化、Sharpe、Sortino、Calmar 依赖 DatetimeIndex 的频率推断、是否包含周末、252/365 等年交易日选择与重采样。它们是框架内一致的比较口径，不是未来实盘收益或风险的保证；非时间索引或不规则频率会削弱解释力。</div>
         <p><code>_Stats</code> 只是改变显示行为的 <code>pd.Series</code> 子类，并包含 <code>_strategy</code>、<code>_equity_curve</code>、<code>_trades</code> 三个内部结果。绘图读取并可重采样副本，不写回 broker。</p>
         <div class="callout"><strong>Buy &amp; Hold 边界：</strong>收益从 <code>Close[warmup]</code> 起算；主循环从 <code>1 + warmup</code> 开始。这不是数据第一行，也不是首次 <code>Strategy.next()</code> 所在 bar。</div>
-        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer5">自测：追溯 Max. Drawdown</button><div id="answer5" data-answer><p><code>Max. Drawdown → dd.max() → 1 - equity / cumulative max(equity) → broker._equity → cash + unrealized PnL</code>。</p></div></div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="true" aria-controls="answer5">自测：追溯 Max. Drawdown</button><div id="answer5" data-answer><p><code>Max. Drawdown → dd.max() → 1 - equity / cumulative max(equity) → broker._equity → cash + unrealized PnL</code>。</p></div></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage5" aria-pressed="false">标记阶段5已完成</button></div>
       </article>
 
@@ -427,7 +430,7 @@
         <div class="callout"><strong>精确复制语义：</strong>共享内存按参数 batch 复制。grid 优化中，每生成一个参数 batch，就调用一次 <code>smm.df2shm(self._data)</code>，把 index 和各列复制到该 batch 的一组新共享内存段。共享内存避免的是 batch 内每个参数组合分别重复序列化 DataFrame，并非整个 optimize 只复制一次。</div>
         <p>主进程只向 worker 发送共享内存 name/shape/dtype 元数据和参数 batch。<code>Backtest._mp_task</code> 重建只读 DataFrame，逐组 <code>run()</code>；有交易时只返回不以下划线开头的公开统计，无交易返回 None，最后只 close worker 句柄。创建者在退出时 close + unlink。</p>
         <p><code>backtesting.Pool</code> 是可覆盖入口；spawn 默认路径会警告并退化为线程池。<code>MultiBacktest</code> 在多份数据上独立运行同一策略，每份都有独立现金、broker 与统计；它不是共享资金、多资产 margin 或组合风控引擎。</p>
-        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer6">自测：worker 为什么不返回完整 _Stats？</button><div id="answer6" data-answer><p>过滤 <code>_strategy</code>、<code>_equity_curve</code> 和 <code>_trades</code> 可显著减小跨进程传输；选出最佳组合后，主进程再完整 run 一次取得最终对象。</p></div></div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="true" aria-controls="answer6">自测：worker 为什么不返回完整 _Stats？</button><div id="answer6" data-answer><p>过滤 <code>_strategy</code>、<code>_equity_curve</code> 和 <code>_trades</code> 可显著减小跨进程传输；选出最佳组合后，主进程再完整 run 一次取得最终对象。</p></div></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage6" aria-pressed="false">标记阶段6已完成</button></div>
       </article>
 
@@ -440,7 +443,7 @@
         <p>每个行为测试都记三列：最小 OHLC 序列、策略在第几次 <code>next()</code> 发了什么订单、断言属于价格/时间/状态/警告中的哪一类。测试通过只证明实现符合仓库模型，不证明与真实交易所相同。</p>
         <ol class="flow"><li>行为问题</li><li><code>rg</code> 定位测试</li><li>抄最小数据与动作</li><li>列出断言</li><li>回源码分支</li><li>逐 bar 手推</li></ol>
         <div class="callout"><strong>阅读陷阱：</strong>测试文件顶部可能把 Backtest 包成 <code>finalize_trades=True</code> 的 partial。先确认测试使用包装别名还是原始类，否则会把默认收尾行为读反。</div>
-        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer7">自测：为何最终 cash 断言不够？</button><div id="answer7" data-answer><p>多个错误可能在总收益上抵消。还需独立断言 Entry/ExitPrice、Entry/ExitBar、Commission、订单清理以及预期警告。</p></div></div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="true" aria-controls="answer7">自测：为何最终 cash 断言不够？</button><div id="answer7" data-answer><p>多个错误可能在总收益上抵消。还需独立断言 Entry/ExitPrice、Entry/ExitBar、Commission、订单清理以及预期警告。</p></div></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage7" aria-pressed="false">标记阶段7已完成</button></div>
       </article>
 
@@ -484,6 +487,7 @@
         <section data-order-panel="1"><h3>步骤 2：bar 2 先 broker 撮合</h3><p>OHLC=100/108/99/106。基础 Open=100；long spread 后 EntryPrice=101。开仓 commission=<code>10 × 101 × 0.5% = 5.05</code>，cash=9,994.95；创建 Trade 与两张 size=-10 的 SL/TP 单。</p></section>
         <section data-order-panel="2"><h3>步骤 3：同 bar 检查与持有</h3><p>Low=99、High=108，SL 95 和 TP 110 均未触发。Close=106 时未实现 PnL=<code>10 × (106 - 101) = 50</code>，equity=10,044.95。</p></section>
         <section data-order-panel="3"><h3>步骤 4：bar 3 命中 TP</h3><p>OHLC=109/112/104/111。TP limit=110 命中，以 110 平仓；退出 commission=<code>10 × 110 × 0.5% = 5.50</code> 并取消 SL。毛 PnL=90，总 commission=10.55，净 PnL=79.45，最终 cash/equity=10,079.45。</p></section>
+        <div class="callout"><strong>框架假设 · 逐 bar 推演：</strong>上述每步用单根 OHLC 范围和固定队列规则推断触发与成交价；bar 内真实价格路径、SL/TP 先后、流动性与实际成交都不可由 OHLC 证明，因此结果不是实盘成交保证。</div>
         <div class="controls">
           <button type="button" data-action="step-order" data-direction="-1" aria-label="订单生命周期上一步" disabled>上一步</button>
           <button type="button" data-action="step-order" data-direction="1" aria-label="订单生命周期下一步">下一步</button>
@@ -525,13 +529,13 @@
         </ul>
         <h3>口述追问</h3>
         <ol><li>为什么先 strategy 后 broker 会改变默认市价单的因果含义？</li><li>为什么完整底层数组与安全渐进访问不矛盾？</li><li>为什么 spread 在价格、commission 在现金，却都必须进入净 PnL？</li><li>为什么最佳参数必须在主进程完整复跑？</li><li>图表错但 <code>_trades</code> 对，应查哪层；ExitPrice 错又应查哪层？</li></ol>
-        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="acceptance-answer">查看排查顺序</button><div id="acceptance-answer" data-answer><p>数据可见窗口 → 订单队列 → 当前 OHLC 触发 → spread/commission 与价格 → Trade 集合 → equity → <code>compute_stats</code> → plotting。顺着状态流比从最终 Sharpe 倒猜更可靠。</p></div></div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="true" aria-controls="acceptance-answer">查看排查顺序</button><div id="acceptance-answer" data-answer><p>数据可见窗口 → 订单队列 → 当前 OHLC 触发 → spread/commission 与价格 → Trade 集合 → equity → <code>compute_stats</code> → plotting。顺着状态流比从最终 Sharpe 倒猜更可靠。</p></div></div>
         <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="acceptance" aria-pressed="false">标记学习验收已完成</button></div>
       </article>
     </main>
   </div>
 
-  <footer>源码事实基线 cadcbe2 · Fork 以 origin 表示个人远端，upstream 表示原项目；同步后应重新核对四条调用链与行为测试。</footer>
+  <footer>源码事实基线 cadcbe2。Fork 以 origin 表示个人远端，upstream 表示原项目：让 master 保持跟踪上游，在单独学习分支记录修改；先运行 <code>git fetch upstream</code>，再用 <code>git log --oneline --left-right master...upstream/master</code> 比较差异，确认后显式 merge 或 rebase，不直接覆盖学习记录。同步后重新核对四条调用链与行为测试。</footer>
 
   <script>
     const state = {
@@ -553,12 +557,14 @@
     function saveProgress() {
       try {
         localStorage.setItem("backtesting-learning-progress", JSON.stringify([...state.completed]));
+        return true;
       } catch (error) {
         // 即使无法持久化，正文阅读和当前会话内的进度仍可使用。
+        return false;
       }
     }
 
-    function renderProgress() {
+    function renderProgress(progressWasSaved = true) {
       const items = [...document.querySelectorAll("[data-completable]")];
       const validIds = new Set(items.map((item) => item.id));
       state.completed = new Set([...state.completed].filter((id) => validIds.has(id)));
@@ -575,7 +581,9 @@
         const label = item.querySelector("[data-complete-label]");
         button.setAttribute("aria-pressed", String(isComplete));
         button.textContent = isComplete ? "取消完成标记" : button.dataset.originalLabel;
-        label.textContent = isComplete ? "已完成并保存" : "尚未标记";
+        label.textContent = isComplete
+          ? (progressWasSaved ? "已完成并保存" : "当前会话已完成（未保存）")
+          : "尚未标记";
         label.classList.toggle("complete-state", isComplete);
       });
     }
@@ -589,7 +597,10 @@
         button.setAttribute("aria-current", button.dataset.stage === stage ? "page" : "false");
       });
       const panel = document.querySelector(`[data-stage-panel="${stage}"]`);
-      if (panel && shouldScroll) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (panel && shouldScroll) {
+        const behavior = window.matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+        panel.scrollIntoView({ behavior, block: "start" });
+      }
     }
 
     function selectChain(chain) {
@@ -631,6 +642,8 @@
     });
     document.querySelectorAll("[data-detail], [data-answer]").forEach((region) => {
       region.hidden = true;
+      const controller = document.querySelector(`[aria-controls="${region.id}"]`);
+      if (controller) controller.setAttribute("aria-expanded", "false");
     });
 
     document.addEventListener("click", (event) => {
@@ -649,8 +662,8 @@
         const target = button.dataset.target;
         if (state.completed.has(target)) state.completed.delete(target);
         else state.completed.add(target);
-        saveProgress();
-        renderProgress();
+        const progressWasSaved = saveProgress();
+        renderProgress(progressWasSaved);
       }
     });
 
