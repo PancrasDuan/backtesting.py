@@ -1,0 +1,663 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Backtesting.py 源码架构学习地图</title>
+  <style>
+    :root {
+      --bg: #f7f8fa;
+      --surface: #ffffff;
+      --surface-soft: #eef2f6;
+      --text: #17202a;
+      --muted: #536170;
+      --border: #cbd3dc;
+      --accent: #185fa5;
+      --accent-soft: #deecf8;
+      --accent-text: #0c406f;
+      --success: #23744b;
+      --warning: #8a5a00;
+      --code: #edf1f4;
+      --shadow: 0 10px 30px rgb(23 32 42 / 8%);
+      --radius: 14px;
+      --measure: 76ch;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #11161c;
+        --surface: #182028;
+        --surface-soft: #202b35;
+        --text: #edf3f8;
+        --muted: #b6c1cb;
+        --border: #3a4855;
+        --accent: #86bff0;
+        --accent-soft: #173a58;
+        --accent-text: #d9edff;
+        --success: #7ed6a5;
+        --warning: #f0c36a;
+        --code: #202a34;
+        --shadow: 0 10px 30px rgb(0 0 0 / 25%);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      color: var(--text);
+      background: var(--bg);
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.7;
+    }
+    a { color: var(--accent); }
+    button, progress { font: inherit; }
+    button {
+      min-height: 2.6rem;
+      padding: .55rem .85rem;
+      border: 1px solid var(--border);
+      border-radius: .65rem;
+      color: var(--text);
+      background: var(--surface);
+      cursor: pointer;
+    }
+    button:hover { background: var(--surface-soft); }
+    button[aria-current="page"],
+    button[aria-pressed="true"] {
+      color: var(--accent-text);
+      background: var(--accent-soft);
+      border-color: var(--accent);
+      font-weight: 700;
+    }
+    button:focus-visible, a:focus-visible {
+      outline: 3px solid var(--accent);
+      outline-offset: 3px;
+    }
+    code {
+      padding: .12em .35em;
+      border-radius: .3rem;
+      background: var(--code);
+      overflow-wrap: anywhere;
+    }
+    pre {
+      padding: 1rem;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: .7rem;
+      background: var(--code);
+    }
+    pre code { padding: 0; background: transparent; }
+    h1, h2, h3 { line-height: 1.25; text-wrap: balance; }
+    h1 { margin: 0; font-size: clamp(2rem, 5vw, 3.7rem); letter-spacing: -.035em; }
+    h2 { margin-top: 0; font-size: clamp(1.55rem, 3vw, 2.25rem); }
+    h3 { margin-top: 2rem; font-size: 1.15rem; }
+    p, li { max-width: var(--measure); }
+    header {
+      padding: clamp(2rem, 6vw, 5.5rem) max(1rem, calc((100% - 1180px) / 2));
+      border-bottom: 1px solid var(--border);
+      background: linear-gradient(145deg, var(--surface), var(--accent-soft));
+    }
+    header .eyebrow { color: var(--accent-text); font-weight: 750; letter-spacing: .08em; }
+    header .lede { max-width: 68ch; font-size: 1.08rem; }
+    .baseline { display: flex; gap: .6rem 1.2rem; flex-wrap: wrap; color: var(--muted); }
+    .progress-box { max-width: 34rem; margin-top: 1.4rem; }
+    .progress-line { display: flex; justify-content: space-between; gap: 1rem; }
+    progress { width: 100%; accent-color: var(--accent); }
+    noscript p {
+      margin: 1rem auto 0;
+      padding: .8rem 1rem;
+      max-width: 1180px;
+      border: 1px solid var(--warning);
+      border-radius: .6rem;
+    }
+    .layout {
+      display: grid;
+      grid-template-columns: minmax(13rem, 17rem) minmax(0, 1fr);
+      gap: clamp(1rem, 3vw, 2.5rem);
+      max-width: 1180px;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 5rem;
+      align-items: start;
+    }
+    nav {
+      position: sticky;
+      top: 1rem;
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    nav h2 { font-size: 1rem; }
+    .nav-list { display: grid; gap: .4rem; }
+    .nav-list button { width: 100%; text-align: left; }
+    main { min-width: 0; }
+    article {
+      padding: clamp(1.1rem, 3vw, 2.4rem);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .js article[hidden], .js [data-chain-panel][hidden], .js [data-order-panel][hidden],
+    .js [data-detail][hidden], .js [data-answer][hidden] { display: none; }
+    .kicker { color: var(--accent); font-weight: 750; }
+    .objective {
+      padding-left: 1rem;
+      border-left: 4px solid var(--accent);
+      color: var(--muted);
+    }
+    .concept-grid, .boundary-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 1rem;
+    }
+    .concept {
+      padding: 1rem;
+      border: 1px solid var(--border);
+      border-radius: .75rem;
+      background: var(--surface-soft);
+    }
+    .concept h3 { margin: 0 0 .35rem; }
+    .concept p { margin: 0; }
+    .flow {
+      display: flex;
+      align-items: stretch;
+      gap: .5rem;
+      flex-wrap: wrap;
+      margin: 1rem 0;
+      padding: 0;
+      list-style: none;
+    }
+    .flow li {
+      position: relative;
+      flex: 1 1 9rem;
+      padding: .8rem 1.8rem .8rem .8rem;
+      border: 1px solid var(--border);
+      border-radius: .65rem;
+      background: var(--surface-soft);
+    }
+    .flow li:not(:last-child)::after {
+      content: "→";
+      position: absolute;
+      right: .45rem;
+      color: var(--accent);
+      font-weight: 800;
+    }
+    .controls { display: flex; flex-wrap: wrap; gap: .55rem; margin: 1rem 0; }
+    .detail { padding: .9rem 1rem; border-left: 3px solid var(--accent); background: var(--surface-soft); }
+    .callout {
+      padding: .9rem 1rem;
+      border: 1px solid var(--border);
+      border-inline-start: 5px solid var(--warning);
+      border-radius: .6rem;
+      background: var(--surface-soft);
+    }
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; min-width: 38rem; }
+    th, td { padding: .7rem; border-bottom: 1px solid var(--border); text-align: left; vertical-align: top; }
+    th { color: var(--muted); }
+    .checklist { padding-left: 1.3rem; }
+    .complete-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 1rem;
+      margin-top: 2.2rem;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+    }
+    .complete-state { color: var(--success); font-weight: 700; }
+    .chain-graphic {
+      display: grid;
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      align-items: center;
+      gap: .45rem;
+      margin: 1rem 0;
+    }
+    .node {
+      min-width: 0;
+      padding: .75rem .45rem;
+      border: 1px solid var(--border);
+      border-radius: .6rem;
+      background: var(--surface-soft);
+      text-align: center;
+      overflow-wrap: anywhere;
+    }
+    .arrow { color: var(--accent); text-align: center; font-weight: 900; }
+    .order-track { display: grid; grid-template-columns: repeat(4, 1fr); gap: .45rem; margin: 1rem 0; }
+    .order-track span { padding: .65rem; border-bottom: 3px solid var(--border); text-align: center; }
+    .order-track span[aria-current="step"] { border-color: var(--accent); color: var(--accent); font-weight: 750; }
+    .quiz { margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid var(--border); }
+    footer { padding: 2rem 1rem 4rem; color: var(--muted); text-align: center; }
+
+    @media (max-width: 640px) {
+      .layout { grid-template-columns: 1fr; padding-inline: .7rem; }
+      nav { position: static; }
+      .nav-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .nav-list button { text-align: center; overflow-wrap: anywhere; }
+      .concept-grid, .boundary-grid { grid-template-columns: 1fr; }
+      .chain-graphic { grid-template-columns: 1fr; }
+      .arrow { transform: rotate(90deg); }
+      .order-track { grid-template-columns: 1fr; }
+      .complete-row { align-items: stretch; flex-direction: column; }
+      .complete-row button { width: 100%; }
+      table { min-width: 34rem; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      html { scroll-behavior: auto; }
+      *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+    }
+  </style>
+  <script>document.documentElement.classList.add("js");</script>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">源码架构 · 交互式学习地图</div>
+    <h1>Backtesting.py，从 API 追到撮合与统计</h1>
+    <p class="lede">面向已能阅读 Python、NumPy 与 Pandas 的学习者。目标不是背 API，而是在源码基线 <code>cadcbe2</code> 上建立一条可复述、可手推、可验证的系统状态流。</p>
+    <div class="baseline">
+      <span>事实基线：<strong>cadcbe2</strong></span>
+      <span>学习路径：总览 → 7 个阶段 → 调用链 → 交易推演 → 边界 → 验收</span>
+    </div>
+    <div class="progress-box">
+      <div class="progress-line"><label for="learning-progress">学习进度</label><strong id="learning-progress-label">0 / 12</strong></div>
+      <progress id="learning-progress" max="12" value="0">0 / 12</progress>
+    </div>
+  </header>
+
+  <noscript><p>JavaScript 已禁用：所有章节、调用链、订单步骤与答案仍按文档顺序完整显示；仅阶段切换与学习进度保存不可用。</p></noscript>
+
+  <div class="layout">
+    <nav aria-label="学习地图导航">
+      <h2>学习路线</h2>
+      <div class="nav-list">
+        <button type="button" data-action="select-stage" data-stage="overview" aria-current="page">总览</button>
+        <button type="button" data-action="select-stage" data-stage="stage1" aria-current="false">阶段1 · API</button>
+        <button type="button" data-action="select-stage" data-stage="stage2" aria-current="false">阶段2 · 时钟</button>
+        <button type="button" data-action="select-stage" data-stage="stage3" aria-current="false">阶段3 · 状态</button>
+        <button type="button" data-action="select-stage" data-stage="stage4" aria-current="false">阶段4 · 撮合</button>
+        <button type="button" data-action="select-stage" data-stage="stage5" aria-current="false">阶段5 · 统计</button>
+        <button type="button" data-action="select-stage" data-stage="stage6" aria-current="false">阶段6 · 并行</button>
+        <button type="button" data-action="select-stage" data-stage="stage7" aria-current="false">阶段7 · 测试</button>
+        <button type="button" data-action="select-stage" data-stage="chains" aria-current="false">四条调用链</button>
+        <button type="button" data-action="select-stage" data-stage="order" aria-current="false">交易推演</button>
+        <button type="button" data-action="select-stage" data-stage="boundary" aria-current="false">系统边界</button>
+        <button type="button" data-action="select-stage" data-stage="acceptance" aria-current="false">学习验收</button>
+      </div>
+    </nav>
+
+    <main id="learning-content">
+      <article id="overview" data-stage-panel="overview" data-completable>
+        <p class="kicker">总览 · 先看所有权，再看调用</p>
+        <h2>一个回测，是六层协作的一次状态旅程</h2>
+        <p class="objective">输入是一份 OHLC(V) <code>DataFrame</code>、一个 <code>Strategy</code> 子类和参数；输出是订单与交易历史、完整权益曲线、<code>_Stats</code> 和图表。关键不是对象有多少，而是谁拥有可变事实。</p>
+        <ol class="flow" aria-label="系统主数据流">
+          <li>公开入口<br><code>Backtest.run</code></li>
+          <li>策略层<br><code>Strategy.I</code></li>
+          <li>时间窗口<br><code>_Data</code> / <code>_Indicator</code></li>
+          <li>交易真相<br><code>_Broker</code></li>
+          <li>结果<br><code>compute_stats</code> / <code>_Stats</code></li>
+          <li>并行包装<br><code>Pool</code> / <code>MultiBacktest</code></li>
+        </ol>
+        <div class="concept-grid">
+          <section class="concept"><h3>策略表达意图</h3><p><code>Strategy</code> 读取当前窗口，通过 <code>buy()</code>/<code>sell()</code> 创建订单；它不维护账户真相。</p></section>
+          <section class="concept"><h3>Broker 拥有状态</h3><p><code>_Broker</code> 独占 orders、活动 trades、closed trades、cash 与 equity。<code>Position</code> 只是汇总视图。</p></section>
+          <section class="concept"><h3>统计只消费结果</h3><p><code>compute_stats</code> 从交易和权益生成结果；<code>_plotting</code> 读取结果而不参与成交。</p></section>
+          <section class="concept"><h3>并行有明确边界</h3><p><code>SharedMemoryManager</code> 传数据，<code>Pool</code> 执行参数批次；最佳参数回到主进程完整复跑。</p></section>
+        </div>
+        <h3>一次 run 的九个动作</h3>
+        <ol>
+          <li>校验并保存输入；每次 <code>run()</code> 新建 <code>_Data</code>、<code>_Broker</code> 与策略实例。</li>
+          <li>校验策略参数，调用一次 <code>init()</code>，让 <code>Strategy.I</code> 全量预计算指标。</li>
+          <li><code>_Data._update()</code> 重建列数组，识别指标与 warmup。</li>
+          <li>每根 bar 先 <code>_set_length(i + 1)</code>、同步指标切片，再 <code>broker.next()</code>，最后 <code>strategy.next()</code>。</li>
+          <li><code>finalize_trades</code> 可在最后 OHLC 上强制处理剩余平仓单。</li>
+          <li>补齐完整权益，交给 <code>compute_stats</code>。</li>
+        </ol>
+        <div class="callout"><strong>第一不变量：</strong>交易状态的唯一事实来源是 <code>_Broker</code>。Order、Trade、Position 和 Strategy 都不能另存一套“账户真相”。</div>
+        <div class="quiz">
+          <button type="button" data-action="toggle-detail" aria-expanded="false" aria-controls="overview-detail">展开：为什么先 broker 后 strategy？</button>
+          <div id="overview-detail" data-detail><p>这使当前 <code>strategy.next()</code> 新建的默认市价单只能在下一次 broker tick 处理，通常按下一 bar Open 成交，从而保留 bar 级因果顺序。<code>trade_on_close</code> 只改变下一次撮合采用前一 Close 和时间索引，并非同步成交。</p></div>
+        </div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="overview" aria-pressed="false">标记总览已完成</button></div>
+      </article>
+
+      <article id="stage1" data-stage-panel="stage1" data-completable>
+        <p class="kicker">阶段1 · 从公开 API 进入主循环</p>
+        <h2><code>Backtest.run</code> 负责装配，<code>Strategy.I</code> 负责声明指标</h2>
+        <p class="objective">读完要能逐行讲清主循环，并说明配置对象为何可以重复运行。</p>
+        <h3>推荐源码顺序</h3>
+        <ol><li><code>backtesting/__init__.py</code> 的公开导出与 <code>Pool</code>。</li><li><code>Strategy._check_params</code>、<code>Strategy.I</code>、<code>buy()</code>/<code>sell()</code>。</li><li><code>Backtest.__init__</code> 的输入校验与 broker 工厂。</li><li><code>Backtest.run</code> 从装配读到 <code>compute_stats</code>。</li></ol>
+        <h3>核心机制</h3>
+        <p><code>Backtest.__init__</code> 是配置阶段：浅复制数据外壳、补 Volume、检查 OHLC 与索引，再保存 broker 的 partial。每次 <code>run()</code> 才创建相互隔离的运行期对象。策略参数必须先是类属性，<code>_check_params</code> 才允许覆盖，拼写错误会尽早暴露。</p>
+        <p><code>Strategy.I(func, ...)</code> 在 <code>init()</code> 中立即使用全量数据计算，检查结果是一至二维且最后一维与数据等长，再包装为携带名称、索引和绘图元数据的 <code>_Indicator</code>。主循环缩短的是可见切片，不是逐 bar 重算函数。</p>
+        <pre><code>for i in range(1 + warmup, len(original_data)):
+    data._set_length(i + 1)
+    strategy.indicator = indicator[..., :i + 1]
+    broker.next()
+    strategy.next()</code></pre>
+        <div class="callout"><strong>观察点：</strong><code>start = 1 + _indicator_warmup_nbars(strategy)</code>。<code>+1</code> 保证至少可以安全访问上一条记录。</div>
+        <h3>自测</h3>
+        <p>类属性 <code>n = 10</code> 时，<code>run(n=20)</code> 会覆盖声明参数；<code>run(nn=20)</code> 因未知参数失败。哪些动作每次 run 一次，哪些每 bar 一次？</p>
+        <button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer1">查看答案</button>
+        <div id="answer1" data-answer><p>装配、参数校验、<code>init()</code>、指标全量计算和统计各一次；窗口推进、指标切片、broker 撮合、strategy 决策按 bar 重复。</p></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage1" aria-pressed="false">标记阶段1已完成</button></div>
+      </article>
+
+      <article id="stage2" data-stage-panel="stage2" data-completable>
+        <p class="kicker">阶段2 · 时间推进与未来数据隔离</p>
+        <h2>底层数组完整，不等于策略能看到未来</h2>
+        <p class="objective">读完要能区分 <code>_set_length</code>、<code>_update</code> 与 warmup，并指出可绕过的未来数据泄漏。</p>
+        <h3>三种职责</h3>
+        <div class="concept-grid">
+          <section class="concept"><h3><code>_Data._set_length</code></h3><p>只改变逻辑长度并清空列切片缓存。下次访问 <code>data.Close</code> 才按需返回当前前缀，不复制整张 DataFrame。</p></section>
+          <section class="concept"><h3><code>_Data._update</code></h3><p><code>init()</code> 后重建完整列数组，以接纳策略对 <code>data.df</code> 的列修改；它不是时钟推进。</p></section>
+          <section class="concept"><h3><code>_Indicator</code> 切片</h3><p>主循环把完整指标替换为 <code>[..., :i + 1]</code>，保持数据窗口和策略指标同长。</p></section>
+          <section class="concept"><h3>warmup</h3><p>对非 scatter 指标取前置 NaN 长度的最大值，决定第一个策略调用位置。</p></section>
+        </div>
+        <h3>安全路径与绕过路径</h3>
+        <p>正常通过 <code>self.data</code>、<code>_Array.s</code>/<code>.df</code> 与 <code>self.I()</code> 属性访问时，只能看到当前窗口。但若在 <code>init()</code> 保存当时的全长 <code>self.data.Close</code> 引用，并在 <code>next()</code> 直接读取其尾部，就绕过了切片协议。这是框架约定，不是进程级沙箱。</p>
+        <div class="callout"><strong>精确时间边界：</strong>Buy &amp; Hold 从 Close[warmup] 而主循环从 1+warmup 开始。若 warmup=9，基准从 Close[9] 起算；主循环从 i=10 开始，第一次 <code>Strategy.next()</code> 看见 11 条记录，因此基准起点比首次策略调用早一根 bar。</div>
+        <button type="button" data-action="toggle-detail" aria-expanded="false" aria-controls="stage2-detail">展开：缓存为何必须清空？</button>
+        <div id="stage2-detail" data-detail><p><code>_Data.__get_array()</code> 缓存当前长度的切片视图。若推进长度后不清缓存，策略会继续拿到旧前缀；若直接缓存全长，又会破坏可见性。</p></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage2" aria-pressed="false">标记阶段2已完成</button></div>
+      </article>
+
+      <article id="stage3" data-stage-panel="stage3" data-completable>
+        <p class="kicker">阶段3 · 订单、交易与持仓状态模型</p>
+        <h2><code>Order</code> 是意图，<code>Trade</code> 是 lot，<code>Position</code> 是视图</h2>
+        <p class="objective">读完要能解释关闭 API、反向下单、<code>hedging</code> 与 <code>exclusive_orders</code> 的差别。</p>
+        <div class="concept-grid">
+          <section class="concept"><h3>Order</h3><p>等待撮合的指令。size 正负代表方向；0 到 1 之间的绝对值表示可用流动性比例，绝对值至少 1 时是整数单位。</p></section>
+          <section class="concept"><h3>Trade</h3><p>独立成交 lot，保存 entry/exit price、bar、size、tag、commission 及可选 SL/TP 关联。</p></section>
+          <section class="concept"><h3>Position</h3><p>动态汇总 broker 上的活动 trades，不独立保存仓位。多个 trade 仍只有一个净视图。</p></section>
+          <section class="concept"><h3>SL / TP</h3><p>都是带 parent trade 的反向 contingent <code>Order</code>：SL 是 stop-market，TP 是 limit。</p></section>
+        </div>
+        <h3>生命周期</h3>
+        <ol class="flow"><li>Pending Order</li><li>Active Trade</li><li>部分 reduce 或 close order</li><li>Closed Trade</li></ol>
+        <p><code>Trade.close(portion)</code> 创建带 <code>parent_trade</code> 的反向市价单并插入队首；<code>Position.close</code> 对每个活动 trade 分别做同样动作。普通 <code>sell()</code> 是独立订单：<code>hedging=False</code> 时可 FIFO 抵消 long，<code>hedging=True</code> 时多空可并存。</p>
+        <p><code>exclusive_orders=True</code> 会取消非 contingent 挂单，并给现有 trades 插入 close orders，再排入新订单。父 trade 全平时，SL/TP 同步取消形成 OCO；部分平仓会复制一份 closed trade 记录，并缩小剩余 trade 与附属单 size。</p>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer3">自测：为什么 sell 不等于精确平仓？</button><div id="answer3" data-answer><p>sell 没有指定 parent trade，其结果受 hedging、FIFO 抵消、单位换算和可用 margin 影响。若要关闭指定 lot，应使用 <code>Trade.close()</code>；关闭净视图用 <code>Position.close()</code>。</p></div></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage3" aria-pressed="false">标记阶段3已完成</button></div>
+      </article>
+
+      <article id="stage4" data-stage-panel="stage4" data-completable>
+        <p class="kicker">阶段4 · 精读撮合引擎</p>
+        <h2><code>_process_orders</code> 把一根 OHLC 变成确定性模型结果</h2>
+        <p class="objective">读完要能推导 market、limit、stop-market、stop-limit，并标记同 bar 先后未知的边界。</p>
+        <ol class="flow" aria-label="撮合判断顺序"><li>取当前 Open / High / Low</li><li>检查 stop</li><li>检查 limit 或 market</li><li>处理 parent / FIFO</li><li>检查 margin</li><li>open / reduce / close</li></ol>
+        <div class="table-wrap"><table><thead><tr><th>订单</th><th>触发</th><th>基础成交价</th></tr></thead><tbody>
+          <tr><td>默认市价单</td><td>下一次 broker tick</td><td>通常当前 Open</td></tr>
+          <tr><td><code>trade_on_close=True</code> 的非 contingent 纯市价单</td><td>仍在下一次 broker tick</td><td>前一 bar Close，时间索引也记前一 bar</td></tr>
+          <tr><td>long stop-market</td><td>High ≥ stop</td><td><code>max(Open, stop)</code>，跳空可劣化</td></tr>
+          <tr><td>long limit</td><td>Low ≤ limit</td><td><code>min(Open, limit)</code>，开盘可改善</td></tr>
+          <tr><td>contingent SL / TP</td><td>SL 用 stop，TP 用 limit</td><td>关闭价不再做独立 entry spread 调整</td></tr>
+        </tbody></table></div>
+        <h3>账户与成本</h3>
+        <ul><li><code>spread</code> 进入方向调整后的 stand-alone 入场价：long × (1 + spread)，short × (1 - spread)。</li><li><code>commission</code> 是现金流，开仓和平仓各收一次；可以是比例、固定加比例或函数。</li><li><code>margin</code> 转成 <code>leverage = 1 / margin</code>，约束可新增名义价值，不是简单扣掉一笔保证金现金。</li><li>equity = cash + 活动 trades 的未实现 PnL；margin available = max(0, equity - margin used)。</li></ul>
+        <div class="callout"><strong>同 bar 歧义：</strong>OHLC 只能证明价格范围，不能证明先到 SL 还是 TP。market entry 新附属单会在同 bar 重处理，SL 因队列在前形成保守结果；stop/limit 父订单的不可判定附属单可被警告并延后。没有订单簿、容量、冲击、排队和逐笔路径。</div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer4">自测：long stop=105，Open=108，High=110</button><div id="answer4" data-answer><p>stop 命中，基础成交价是 <code>max(108, 105) = 108</code>，体现向上跳空后以更差价格开多。之后再计算方向 spread 与 commission。</p></div></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage4" aria-pressed="false">标记阶段4已完成</button></div>
+      </article>
+
+      <article id="stage5" data-stage-panel="stage5" data-completable>
+        <p class="kicker">阶段5 · 结果、统计与绘图</p>
+        <h2>交易层与权益层使用不同、但彼此一致的事实源</h2>
+        <p class="objective">读完要能从 <code>_Stats</code> 反向追溯任一主要指标的数据来源。</p>
+        <ol class="flow"><li><code>broker._equity</code></li><li><code>broker.closed_trades</code></li><li><code>compute_stats</code></li><li><code>_Stats</code></li><li><code>_plotting.plot</code></li></ol>
+        <p>broker 每次 <code>next()</code> 后写当期 equity。循环结束，前缀与空位被补齐，<code>compute_stats</code> 同时收到完整 equity、closed trades、原 OHLC 和策略。</p>
+        <div class="callout"><strong>必须分清：</strong>交易层指标只用 closed trades，而权益类指标用完整 equity。具体地，<code>_trades</code>、胜率、SQN、平均交易等只使用 broker.closed_trades；Equity Final、Return、回撤等读取完整 equity，其中仍含活动 trade 的未实现盈亏。<code>finalize_trades</code> 决定末尾活动 trade 是否被强制关闭并进入交易表与交易层指标。</div>
+        <p><code>compute_stats</code> 从交易构造 Size、Entry/ExitBar、价格、PnL、Commission、ReturnPct、时间、Duration、Tag 与指标值；从 equity 构造收益、累计峰值、DrawdownPct 和回撤持续时间。SQN 是交易 PnL 的函数，因此不直接依赖 OHLC；年化、Sharpe、Sortino、Calmar 则还依赖时间索引、交易日假设和重采样。</p>
+        <p><code>_Stats</code> 只是改变显示行为的 <code>pd.Series</code> 子类，并包含 <code>_strategy</code>、<code>_equity_curve</code>、<code>_trades</code> 三个内部结果。绘图读取并可重采样副本，不写回 broker。</p>
+        <div class="callout"><strong>Buy &amp; Hold 边界：</strong>收益从 <code>Close[warmup]</code> 起算；主循环从 <code>1 + warmup</code> 开始。这不是数据第一行，也不是首次 <code>Strategy.next()</code> 所在 bar。</div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer5">自测：追溯 Max. Drawdown</button><div id="answer5" data-answer><p><code>Max. Drawdown → dd.max() → 1 - equity / cumulative max(equity) → broker._equity → cash + unrealized PnL</code>。</p></div></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage5" aria-pressed="false">标记阶段5已完成</button></div>
+      </article>
+
+      <article id="stage6" data-stage-panel="stage6" data-completable>
+        <p class="kicker">阶段6 · 参数优化与并行化</p>
+        <h2><code>SharedMemoryManager</code> 复制数据，<code>Pool</code> 分发参数 batch</h2>
+        <p class="objective">读完要能画出主进程、共享内存、worker 和最佳参数复跑的边界。</p>
+        <h3>搜索方式</h3>
+        <ul><li>grid：参数笛卡尔积先过 constraint；<code>max_tries=None</code> 穷举，比例或正整数转换为抽样概率，所以随机网格次数是近似值。</li><li>SAMBO：模型驱动搜索，以负的 maximize(stats) 为最小化目标并缓存结果；默认最多 200 次，不走 grid 的共享内存 worker 路径。</li></ul>
+        <ol class="flow" aria-label="并行优化数据流"><li>组合 + constraint</li><li>生成参数 batch</li><li><code>df2shm</code> 复制数据</li><li><code>Pool.imap</code></li><li>worker 精简 stats</li><li>主进程最佳参数复跑</li></ol>
+        <div class="callout"><strong>精确复制语义：</strong>共享内存按参数 batch 复制。grid 优化中，每生成一个参数 batch，就调用一次 <code>smm.df2shm(self._data)</code>，把 index 和各列复制到该 batch 的一组新共享内存段。共享内存避免的是 batch 内每个参数组合分别重复序列化 DataFrame，并非整个 optimize 只复制一次。</div>
+        <p>主进程只向 worker 发送共享内存 name/shape/dtype 元数据和参数 batch。<code>Backtest._mp_task</code> 重建只读 DataFrame，逐组 <code>run()</code>；有交易时只返回不以下划线开头的公开统计，无交易返回 None，最后只 close worker 句柄。创建者在退出时 close + unlink。</p>
+        <p><code>backtesting.Pool</code> 是可覆盖入口；spawn 默认路径会警告并退化为线程池。<code>MultiBacktest</code> 在多份数据上独立运行同一策略，每份都有独立现金、broker 与统计；它不是共享资金、多资产 margin 或组合风控引擎。</p>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer6">自测：worker 为什么不返回完整 _Stats？</button><div id="answer6" data-answer><p>过滤 <code>_strategy</code>、<code>_equity_curve</code> 和 <code>_trades</code> 可显著减小跨进程传输；选出最佳组合后，主进程再完整 run 一次取得最终对象。</p></div></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage6" aria-pressed="false">标记阶段6已完成</button></div>
+      </article>
+
+      <article id="stage7" data-stage-panel="stage7" data-completable>
+        <p class="kicker">阶段7 · 把测试当作行为规格</p>
+        <h2>用最小 OHLC 锁定价格、时间、状态与警告</h2>
+        <p class="objective">读完要能从行为关键词定位测试，并把测试还原为逐 bar 事件表。</p>
+        <h3>按行为搜索，不顺读大文件</h3>
+        <ul><li><code>commission</code>、<code>spread</code>、<code>margin</code>：分别锁定价格调整、两端现金流与容量警告。</li><li><code>hedging</code>、<code>exclusive_orders</code>：锁定反向 trade 与订单队列。</li><li><code>trade_on_close</code>：同时断言 Entry/ExitPrice 和 bar。</li><li>SL/TP、stop-entry、gap-through：锁定同 bar 顺序、原 SL 记录与跳空成交价。</li><li><code>finalize_trades</code>：默认活动 trade 不进入 closed trade 统计；开启后末尾再处理。</li></ul>
+        <p>每个行为测试都记三列：最小 OHLC 序列、策略在第几次 <code>next()</code> 发了什么订单、断言属于价格/时间/状态/警告中的哪一类。测试通过只证明实现符合仓库模型，不证明与真实交易所相同。</p>
+        <ol class="flow"><li>行为问题</li><li><code>rg</code> 定位测试</li><li>抄最小数据与动作</li><li>列出断言</li><li>回源码分支</li><li>逐 bar 手推</li></ol>
+        <div class="callout"><strong>阅读陷阱：</strong>测试文件顶部可能把 Backtest 包成 <code>finalize_trades=True</code> 的 partial。先确认测试使用包装别名还是原始类，否则会把默认收尾行为读反。</div>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="answer7">自测：为何最终 cash 断言不够？</button><div id="answer7" data-answer><p>多个错误可能在总收益上抵消。还需独立断言 Entry/ExitPrice、Entry/ExitBar、Commission、订单清理以及预期警告。</p></div></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="stage7" aria-pressed="false">标记阶段7已完成</button></div>
+      </article>
+
+      <article id="chains" data-stage-panel="chains" data-completable>
+        <p class="kicker">速查 · 四条调用链</p>
+        <h2>切换一条链，盯住交接点</h2>
+        <p class="objective">按钮更新同一张关系图与解释；禁用 JavaScript 时四条链全部依次显示。</p>
+        <div class="controls" role="group" aria-label="选择调用链">
+          <button type="button" data-action="select-chain" data-chain="indicator" aria-pressed="true">指标链</button>
+          <button type="button" data-action="select-chain" data-chain="order" aria-pressed="false">下单与成交链</button>
+          <button type="button" data-action="select-chain" data-chain="close" aria-pressed="false">平仓链</button>
+          <button type="button" data-action="select-chain" data-chain="result" aria-pressed="false">结果链</button>
+        </div>
+        <section data-chain-panel="indicator">
+          <h3>指标链</h3><div class="chain-graphic"><div class="node">Strategy.init()</div><div class="arrow">→</div><div class="node">Strategy.I() / 完整 _Indicator</div><div class="arrow">→</div><div class="node">warmup / 逐步切片 / next()</div></div>
+          <p><code>I()</code> 计算、验证并保存元数据；<code>_indicator_warmup_nbars()</code> 决定起点；主循环控制可见性。普通全长数组绕过这条链就可能产生未来数据泄漏。</p>
+        </section>
+        <section data-chain-panel="order">
+          <h3>下单与成交链</h3><div class="chain-graphic"><div class="node">Strategy.buy()/sell()</div><div class="arrow">→</div><div class="node">_Broker.new_order()</div><div class="arrow">→</div><div class="node">_process_orders() / _open_trade()</div></div>
+          <p>策略表达意图，<code>new_order()</code> 校验并排队；下一 broker tick 判断 OHLC、价格、FIFO、margin、spread 与 commission，最终创建 Trade 和可选 SL/TP。</p>
+        </section>
+        <section data-chain-panel="close">
+          <h3>平仓链</h3><div class="chain-graphic"><div class="node">Position.close() / Trade.close()</div><div class="arrow">→</div><div class="node">parent close Order</div><div class="arrow">→</div><div class="node">_reduce_trade() / _close_trade() / closed_trades</div></div>
+          <p>close API 不直接结算；部分平仓同步缩小剩余 SL/TP，全平取消附属单并把 trade 移入 closed_trades。</p>
+        </section>
+        <section data-chain-panel="result">
+          <h3>结果链</h3><div class="chain-graphic"><div class="node">equity + closed trades</div><div class="arrow">→</div><div class="node">compute_stats() / _Stats</div><div class="arrow">→</div><div class="node">Backtest.plot() / _plotting.plot()</div></div>
+          <p>交易域与分析域以不可再改变的 closed trades 和逐 bar equity 为边界。交易层指标只读 closed trades；权益类指标读完整 equity；绘图只消费结果。</p>
+        </section>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="chains" aria-pressed="false">标记调用链已完成</button></div>
+      </article>
+
+      <article id="order" data-stage-panel="order" data-completable>
+        <p class="kicker">交易生命周期推演</p>
+        <h2>10 单位 long：从订单到净 PnL 79.45</h2>
+        <p class="objective">参数：cash=10,000；size=10；spread=1%；commission=0.5%；margin=1；<code>trade_on_close=False</code>；SL=95；TP=110。</p>
+        <div class="order-track" aria-label="订单生命周期进度">
+          <span data-order-marker="0" aria-current="step">1 · 排队</span><span data-order-marker="1">2 · 开仓</span><span data-order-marker="2">3 · 持有</span><span data-order-marker="3">4 · TP 平仓</span>
+        </div>
+        <section data-order-panel="0"><h3>步骤 1：bar 1 决策，只排队</h3><p>OHLC=100/102/99/100。<code>Strategy.next()</code> 调用 <code>buy(size=10, sl=95, tp=110)</code>。新 Order 入队，当前策略调用不成交。</p></section>
+        <section data-order-panel="1"><h3>步骤 2：bar 2 先 broker 撮合</h3><p>OHLC=100/108/99/106。基础 Open=100；long spread 后 EntryPrice=101。开仓 commission=<code>10 × 101 × 0.5% = 5.05</code>，cash=9,994.95；创建 Trade 与两张 size=-10 的 SL/TP 单。</p></section>
+        <section data-order-panel="2"><h3>步骤 3：同 bar 检查与持有</h3><p>Low=99、High=108，SL 95 和 TP 110 均未触发。Close=106 时未实现 PnL=<code>10 × (106 - 101) = 50</code>，equity=10,044.95。</p></section>
+        <section data-order-panel="3"><h3>步骤 4：bar 3 命中 TP</h3><p>OHLC=109/112/104/111。TP limit=110 命中，以 110 平仓；退出 commission=<code>10 × 110 × 0.5% = 5.50</code> 并取消 SL。毛 PnL=90，总 commission=10.55，净 PnL=79.45，最终 cash/equity=10,079.45。</p></section>
+        <div class="controls">
+          <button type="button" data-action="step-order" data-direction="-1" aria-label="订单生命周期上一步" disabled>上一步</button>
+          <button type="button" data-action="step-order" data-direction="1" aria-label="订单生命周期下一步">下一步</button>
+          <strong id="order-step-label" aria-live="polite">步骤 1 / 4：排队</strong>
+        </div>
+        <div class="callout"><strong>SL 分支：</strong>若下一 bar Open=94、High=97、Low=92，关闭 long 的 short stop-market 使用 <code>min(Open, stop)=94</code>，成交价比触发价 95 更差；统计仍保留原 SL=95。触发价与成交价不可混为一谈。</div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="order" aria-pressed="false">标记交易推演已完成</button></div>
+      </article>
+
+      <article id="boundary" data-stage-panel="boundary" data-completable>
+        <p class="kicker">系统边界 · 从研究回测到实盘</p>
+        <h2>保留清晰边界，不复制研究模型的全部假设</h2>
+        <p>Backtesting.py 适合紧凑的单标的逐 bar 研究内核，但不是完整实盘系统。<code>MultiBacktest</code> 也只是独立数据集比较包装。</p>
+        <div class="boundary-grid">
+          <section class="concept"><h3>数据</h3><p>现有：输入 OHLC(V)。新增：采集、版本化、复权、时区/日历、质量检测。</p></section>
+          <section class="concept"><h3>撮合与执行</h3><p>现有：bar OHLC 确定性触发。新增：订单簿、逐笔、容量、排队、部分成交、冲击、券商网关与对账。</p></section>
+          <section class="concept"><h3>状态与组合</h3><p>现有：单次运行内存状态。新增：持久化、恢复、事件日志、共享现金、多资产净额、组合 margin 与风险预算。</p></section>
+          <section class="concept"><h3>风控与运维</h3><p>新增：事前/事后风控、敞口限制、熔断、限频、监控、告警、权限、密钥管理与审计。</p></section>
+          <section class="concept"><h3>研究治理</h3><p>新增：训练/验证/样本外、走步分析、多重检验控制和实验追踪。</p></section>
+          <section class="concept"><h3>分层原则</h3><p>Strategy 表意图；Clock 控因果；Broker 明确成交假设；Portfolio/Accounting 拥有真相；Reporting 只消费事件。</p></section>
+        </div>
+        <div class="callout">订单簿需求不能只给 <code>_process_orders</code> 加一个参数；共享资金也不能把 <code>MultiBacktest</code> 改几行就得到。二者都会改变事件、状态所有权与时间粒度。</div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="boundary" aria-pressed="false">标记系统边界已完成</button></div>
+      </article>
+
+      <article id="acceptance" data-stage-panel="acceptance" data-completable>
+        <p class="kicker">学习验收</p>
+        <h2>能画、能讲、能推，才算完成</h2>
+        <ul class="checklist">
+          <li>能在 <strong>10 分钟内画出</strong>主要模块、对象所有权和 API 到结果的关系。</li>
+          <li>能<strong>逐行讲清</strong> <code>Backtest.run</code> 主循环中窗口、指标、broker、strategy 的顺序。</li>
+          <li>能解释<strong>默认市价单</strong>为何不在当前 <code>Strategy.next()</code> 成交，并比较 <code>trade_on_close</code>。</li>
+          <li>能手推带 <strong>commission、spread、SL、TP</strong> 的完整交易。</li>
+          <li>能指出至少一种<strong>未来数据泄漏</strong>的绕过方式。</li>
+          <li>能解释 stop/limit 父订单与附属单的<strong>同 bar 歧义</strong>。</li>
+          <li>能从 <code>_Stats</code> 追溯任一<strong>主要指标的数据来源</strong>，并区分 closed trades 与完整 equity。</li>
+          <li>能画出优化的<strong>共享内存与多进程</strong>边界及按参数 batch 复制语义。</li>
+          <li>能列出从研究回测迁移到实盘必须新增的<strong>至少五项</strong>能力。</li>
+        </ul>
+        <h3>口述追问</h3>
+        <ol><li>为什么先 strategy 后 broker 会改变默认市价单的因果含义？</li><li>为什么完整底层数组与安全渐进访问不矛盾？</li><li>为什么 spread 在价格、commission 在现金，却都必须进入净 PnL？</li><li>为什么最佳参数必须在主进程完整复跑？</li><li>图表错但 <code>_trades</code> 对，应查哪层；ExitPrice 错又应查哪层？</li></ol>
+        <div class="quiz"><button type="button" data-action="toggle-answer" aria-expanded="false" aria-controls="acceptance-answer">查看排查顺序</button><div id="acceptance-answer" data-answer><p>数据可见窗口 → 订单队列 → 当前 OHLC 触发 → spread/commission 与价格 → Trade 集合 → equity → <code>compute_stats</code> → plotting。顺着状态流比从最终 Sharpe 倒猜更可靠。</p></div></div>
+        <div class="complete-row"><span data-complete-label>尚未标记</span><button type="button" data-action="mark-complete" data-target="acceptance" aria-pressed="false">标记学习验收已完成</button></div>
+      </article>
+    </main>
+  </div>
+
+  <footer>源码事实基线 cadcbe2 · Fork 以 origin 表示个人远端，upstream 表示原项目；同步后应重新核对四条调用链与行为测试。</footer>
+
+  <script>
+    const state = {
+      stage: "overview",
+      chain: "indicator",
+      orderStep: 0,
+      completed: new Set(loadProgress())
+    };
+
+    function loadProgress() {
+      try {
+        const stored = JSON.parse(localStorage.getItem("backtesting-learning-progress") || "[]");
+        return Array.isArray(stored) ? stored : [];
+      } catch (error) {
+        return [];
+      }
+    }
+
+    function saveProgress() {
+      try {
+        localStorage.setItem("backtesting-learning-progress", JSON.stringify([...state.completed]));
+      } catch (error) {
+        // 即使无法持久化，正文阅读和当前会话内的进度仍可使用。
+      }
+    }
+
+    function renderProgress() {
+      const items = [...document.querySelectorAll("[data-completable]")];
+      const validIds = new Set(items.map((item) => item.id));
+      state.completed = new Set([...state.completed].filter((id) => validIds.has(id)));
+      const total = items.length;
+      const done = state.completed.size;
+      const progress = document.getElementById("learning-progress");
+      progress.max = total;
+      progress.value = done;
+      progress.textContent = `${done} / ${total}`;
+      document.getElementById("learning-progress-label").textContent = `${done} / ${total}`;
+      items.forEach((item) => {
+        const isComplete = state.completed.has(item.id);
+        const button = item.querySelector('[data-action="mark-complete"]');
+        const label = item.querySelector("[data-complete-label]");
+        button.setAttribute("aria-pressed", String(isComplete));
+        button.textContent = isComplete ? "取消完成标记" : button.dataset.originalLabel;
+        label.textContent = isComplete ? "已完成并保存" : "尚未标记";
+        label.classList.toggle("complete-state", isComplete);
+      });
+    }
+
+    function selectStage(stage, shouldScroll = true) {
+      state.stage = stage;
+      document.querySelectorAll("[data-stage-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.stagePanel !== stage;
+      });
+      document.querySelectorAll('[data-action="select-stage"]').forEach((button) => {
+        button.setAttribute("aria-current", button.dataset.stage === stage ? "page" : "false");
+      });
+      const panel = document.querySelector(`[data-stage-panel="${stage}"]`);
+      if (panel && shouldScroll) panel.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+
+    function selectChain(chain) {
+      state.chain = chain;
+      document.querySelectorAll("[data-chain-panel]").forEach((panel) => {
+        panel.hidden = panel.dataset.chainPanel !== chain;
+      });
+      document.querySelectorAll('[data-action="select-chain"]').forEach((button) => {
+        button.setAttribute("aria-pressed", String(button.dataset.chain === chain));
+      });
+    }
+
+    function renderOrder() {
+      const panels = [...document.querySelectorAll("[data-order-panel]")];
+      const labels = ["排队", "开仓", "持有", "TP 平仓"];
+      state.orderStep = Math.max(0, Math.min(state.orderStep, panels.length - 1));
+      panels.forEach((panel, index) => { panel.hidden = index !== state.orderStep; });
+      document.querySelectorAll("[data-order-marker]").forEach((marker, index) => {
+        if (index === state.orderStep) marker.setAttribute("aria-current", "step");
+        else marker.removeAttribute("aria-current");
+      });
+      const previous = document.querySelector('[data-action="step-order"][data-direction="-1"]');
+      const next = document.querySelector('[data-action="step-order"][data-direction="1"]');
+      previous.disabled = state.orderStep === 0;
+      next.disabled = state.orderStep === panels.length - 1;
+      document.getElementById("order-step-label").textContent = `步骤 ${state.orderStep + 1} / ${panels.length}：${labels[state.orderStep]}`;
+    }
+
+    function toggleRegion(button, selector) {
+      const region = document.getElementById(button.getAttribute("aria-controls"));
+      if (!region || !region.matches(selector)) return;
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded));
+      region.hidden = expanded;
+    }
+
+    document.querySelectorAll('[data-action="mark-complete"]').forEach((button) => {
+      button.dataset.originalLabel = button.textContent;
+    });
+    document.querySelectorAll("[data-detail], [data-answer]").forEach((region) => {
+      region.hidden = true;
+    });
+
+    document.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+
+      if (action === "select-stage") selectStage(button.dataset.stage);
+      else if (action === "toggle-detail") toggleRegion(button, "[data-detail]");
+      else if (action === "select-chain") selectChain(button.dataset.chain);
+      else if (action === "step-order") {
+        state.orderStep += Number(button.dataset.direction);
+        renderOrder();
+      } else if (action === "toggle-answer") toggleRegion(button, "[data-answer]");
+      else if (action === "mark-complete") {
+        const target = button.dataset.target;
+        if (state.completed.has(target)) state.completed.delete(target);
+        else state.completed.add(target);
+        saveProgress();
+        renderProgress();
+      }
+    });
+
+    selectStage(state.stage, false);
+    selectChain(state.chain);
+    renderOrder();
+    renderProgress();
+  </script>
+</body>
+</html>
