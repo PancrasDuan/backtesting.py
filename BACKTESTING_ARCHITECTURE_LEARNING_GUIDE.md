@@ -468,7 +468,7 @@ flowchart LR
 ### 源码观察点
 
 - Exposure Time 由 EntryBar 到 ExitBar 的 bar 覆盖率计算，不是按不规则时间间隔加权。
-- Buy & Hold Return 从指标预热后的第一个交易 bar 起算，而不是总从数据第一行起算。
+- Buy & Hold Return 从 `Close[warmup]` 起算，也就是首个指标有效 bar；主循环从 `1 + warmup` 开始，所以该基准起点是首次 `Strategy.next()` 之前一根 bar，而不是首次可交易 bar 或数据第一行。
 - `Commissions [$]` 仅在佣金总和为真时加入公开字段；每笔 trade 仍有 Commission 列。
 - `_plotting.plot` 先断言 OHLC 索引与 `_equity_curve` 索引一致，再复制/读取结果；交易为空时关闭若干图层。
 
@@ -554,7 +554,7 @@ flowchart TD
 
 ### 动手推演或自测
 
-给定 `fast=[5,10]`、`slow=[20,30,40]` 与 `constraint=lambda p: p.fast < p.slow`，写出完整网格大小。再画出“DataFrame 在主进程只复制到共享内存一次、参数字典按 batch 传输、公开统计返回”的序列化边界。
+给定 `fast=[5,10]`、`slow=[20,30,40]` 与 `constraint=lambda p: p.fast < p.slow`，写出完整网格大小。再画出“`_optimize_grid` 每生成一个参数 batch，就调用一次 `smm.df2shm(self._data)` 并复制到一组新的共享内存段；这样避免的是每个参数组合各自重复序列化 DataFrame，而不是整个优化只复制一次”的序列化边界。
 
 ### 完成检查
 
@@ -721,7 +721,7 @@ sequenceDiagram
 6. 当前 `_Data` 长度、`data` 列切片和策略 `_Indicator` 属性长度必须一致。
 7. 每根 bar 先撮合旧订单，再执行策略决策；默认市价单不能在同一次 `Strategy.next()` 中即时成交。
 8. commission 在开仓和平仓各结算一次；spread 进入方向调整后的开仓价格，两者不能重复或混算。
-9. 统计只使用已关闭 trades；`finalize_trades` 决定末尾活动 trade 是否被强制转成统计样本。
+9. `_trades` 交易表与交易层指标只使用 `broker.closed_trades`；传入 `compute_stats` 的完整 equity 仍含活动 trade 的未实现盈亏，因此会影响 Equity Final、Return、回撤等权益类指标。`finalize_trades` 决定末尾活动 trade 是否被强制关闭并进入交易表与交易层指标。
 10. worker 返回的精简公开统计与主进程最佳参数完整复跑之间必须分界清楚。
 
 ### 源码阅读记录模板
